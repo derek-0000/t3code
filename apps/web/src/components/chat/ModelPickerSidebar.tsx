@@ -1,6 +1,6 @@
 import { type ProviderInstanceId } from "@t3tools/contracts";
 import { memo, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { SparklesIcon, StarIcon } from "lucide-react";
+import { Settings2Icon, SparklesIcon, StarIcon } from "lucide-react";
 import { ProviderInstanceIcon } from "./ProviderInstanceIcon";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { cn } from "~/lib/utils";
@@ -36,9 +36,15 @@ const PICKER_TOOLTIP_SIDE = "left" as const;
 const PICKER_TOOLTIP_SIDE_OFFSET = 8;
 const PICKER_TOOLTIP_CLASS = "max-w-64 text-balance font-normal leading-snug";
 
+export const MODEL_PICKER_CUSTOM_GROUP_ID = "custom" as const;
+export type ModelPickerSelection =
+  | ProviderInstanceId
+  | "favorites"
+  | typeof MODEL_PICKER_CUSTOM_GROUP_ID;
+
 export const ModelPickerSidebar = memo(function ModelPickerSidebar(props: {
-  selectedInstanceId: ProviderInstanceId | "favorites";
-  onSelectInstance: (instanceId: ProviderInstanceId | "favorites") => void;
+  selectedInstanceId: ModelPickerSelection;
+  onSelectInstance: (instanceId: ModelPickerSelection) => void;
   /**
    * Instance entries to render as rail buttons. Each entry becomes one icon
    * keyed by `instanceId`, so the default built-in Codex and a user-authored
@@ -58,7 +64,7 @@ export const ModelPickerSidebar = memo(function ModelPickerSidebar(props: {
    */
   newBadgeInstanceIds?: ReadonlySet<ProviderInstanceId>;
 }) {
-  const handleSelect = (instanceId: ProviderInstanceId | "favorites") => {
+  const handleSelect = (instanceId: ModelPickerSelection) => {
     props.onSelectInstance(instanceId);
   };
   const showFavorites = props.showFavorites ?? true;
@@ -143,6 +149,33 @@ export const ModelPickerSidebar = memo(function ModelPickerSidebar(props: {
                     className={PICKER_TOOLTIP_CLASS}
                   >
                     Favorites
+                  </TooltipPopup>
+                </Tooltip>
+              </div>
+              <div className="relative w-full">
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <button
+                        className={cn(
+                          "relative isolate flex w-full cursor-pointer aspect-square items-center justify-center rounded-md transition-colors hover:bg-muted",
+                        )}
+                        onClick={() => handleSelect(MODEL_PICKER_CUSTOM_GROUP_ID)}
+                        type="button"
+                        data-model-picker-provider={MODEL_PICKER_CUSTOM_GROUP_ID}
+                        aria-label="Custom"
+                      >
+                        <Settings2Icon className="size-5 shrink-0" aria-hidden />
+                      </button>
+                    }
+                  />
+                  <TooltipPopup
+                    side={PICKER_TOOLTIP_SIDE}
+                    sideOffset={PICKER_TOOLTIP_SIDE_OFFSET}
+                    align="center"
+                    className={PICKER_TOOLTIP_CLASS}
+                  >
+                    Custom
                   </TooltipPopup>
                 </Tooltip>
               </div>

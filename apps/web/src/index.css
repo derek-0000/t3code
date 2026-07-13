@@ -770,6 +770,43 @@ label:has(> select#reasoning-effort) select {
   animation: provider-update-pill-countdown var(--provider-update-pill-dismiss-ms) linear forwards;
 }
 
+@keyframes thinking-step-label-increase {
+  from {
+    opacity: 0;
+    transform: translateY(-100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes thinking-step-label-decrease {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.thinking-step-label-increase {
+  animation: thinking-step-label-increase 180ms ease-out;
+}
+
+.thinking-step-label-decrease {
+  animation: thinking-step-label-decrease 180ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .thinking-step-label-increase,
+  .thinking-step-label-decrease {
+    animation: none;
+  }
+}
+
 /* Diffs theme bridge (match diff surfaces to app palette) */
 .diff-panel-viewport {
   background: color-mix(in srgb, var(--background) 94%, var(--card));

@@ -5,10 +5,23 @@ import {
 } from "@t3tools/contracts";
 import { resolveSelectableModel } from "@t3tools/shared/model";
 import { LegendList, type LegendListRef } from "@legendapp/list/react";
-import { memo, useMemo, useState, useCallback, useEffect, useLayoutEffect, useRef } from "react";
+import {
+  memo,
+  useMemo,
+  useState,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  type ReactNode,
+} from "react";
 import { SearchIcon } from "lucide-react";
 import { ModelListRow } from "./ModelListRow";
-import { ModelPickerSidebar } from "./ModelPickerSidebar";
+import {
+  MODEL_PICKER_CUSTOM_GROUP_ID,
+  ModelPickerSidebar,
+  type ModelPickerSelection,
+} from "./ModelPickerSidebar";
 import { isModelPickerNewModel } from "./modelPickerModelHighlights";
 import { buildModelPickerSearchText, scoreModelPickerSearch } from "./modelPickerSearch";
 import { Combobox, ComboboxEmpty, ComboboxInput, ComboboxListVirtualized } from "../ui/combobox";
@@ -28,6 +41,25 @@ import {
   type ProviderInstanceEntry,
 } from "../../providerInstances";
 import { providerModelKey, sortProviderModelItems } from "../../modelOrdering";
+import { Dithering } from "@paper-design/shaders-react";
+import { Slider } from "../ui/slider";
+
+type DitheringType = "random" | "2x2" | "4x4" | "8x8";
+
+type CustomModelLayer = {
+  colorFront: string;
+  rotation: number;
+};
+
+type CustomModelPickerConfig = {
+  name: string;
+  type: DitheringType;
+  size: number;
+  scale: number;
+  layers: ReadonlyArray<CustomModelLayer>;
+};
+
+type ThinkingStepDirection = "increase" | "decrease";
 
 type ModelPickerItem = {
   slug: string;
@@ -43,10 +75,164 @@ type ModelPickerItem = {
 
 const EMPTY_MODEL_JUMP_LABELS = new Map<string, string>();
 
+const THINKING_LEVELS = ["Low", "Medium", "High", "Extra High", "Max", "Ultra"] as const;
+const MAX_THINKING_STEP = THINKING_LEVELS.length - 1;
+const MIN_DITHERING_SIZE = 0.5;
+const DITHERING_SIZE_MULTIPLIERS = [3, 2.4, 1.9, 1.5, 1, 0.8] as const;
+
+const CUSTOM_MODEL_PICKERS = [
+  {
+    name: "GPT-5.6-Luna",
+    type: "8x8",
+    size: 2,
+    scale: 0.3,
+    layers: [
+      { colorFront: "#b5b5b5", rotation: 180 },
+      { colorFront: "#ffffff", rotation: 0 },
+    ],
+  },
+  {
+    name: "GPT-5.6-Terra",
+    type: "4x4",
+    size: 2,
+    scale: 0.6,
+    layers: [
+      { colorFront: "#15ff00", rotation: 70 },
+      { colorFront: "#0048ff", rotation: 0 },
+    ],
+  },
+  {
+    name: "GPT-5.6-Sol",
+    type: "4x4",
+    size: 2,
+    scale: 0.9,
+    layers: [
+      { colorFront: "#ff8800", rotation: 0 },
+      { colorFront: "#ff6200", rotation: 270 },
+    ],
+  },
+] as const satisfies ReadonlyArray<CustomModelPickerConfig>;
+
+/**
+ * Dithering's size is a pixel size, so smaller values produce more detail.
+ * Each model's configured size is the current quality at Max. Low starts at
+ * a coarser grid for a clearer contrast, while Ultra gets a small final bump.
+ */
+function ditheringSizeForStep(baseSize: number, step: number) {
+  const qualityStep = Math.min(Math.max(Math.round(step), 0), MAX_THINKING_STEP);
+  const sizeMultiplier = DITHERING_SIZE_MULTIPLIERS[qualityStep] ?? 1;
+  return Math.max(MIN_DITHERING_SIZE, baseSize * sizeMultiplier);
+}
+
+function CustomModelPicker({
+  name,
+  type,
+  size,
+  scale,
+  layers,
+}: {
+  name: string;
+  type: DitheringType;
+  size: number;
+  scale: number;
+  layers: ReadonlyArray<CustomModelLayer>;
+}) {
+  const [thinkingStep, setThinkingStep] = useState(0);
+  const [thinkingDirection, setThinkingDirection] = useState<ThinkingStepDirection | null>(null);
+  const previousThinkingStepRef = useRef(thinkingStep);
+  const ditheringSize = ditheringSizeForStep(size, thinkingStep);
+  const thinkingLabel = THINKING_LEVELS[thinkingStep] ?? THINKING_LEVELS[0];
+
+  return (
+    <div className="relative flex w-full flex-row items-center overflow-hidden rounded-lg border border-border">
+      {/*<DotOrbit
+                className="pointer-events-none z-1 absolute inset-0 size-full rounded-lg"
+                colors={["#ffffff"]}
+                colorBack="#000000"
+                stepsPerColor={4}
+                size={0.3}
+                sizeRange={0.2}
+                spreading={1}
+                speed={0.1}
+                scale={0.25}
+            />*/}
+      <div className="relative size-[100px] z-2 shrink-0 overflow-hidden rounded-lg">
+        {layers.map((layer, index) => (
+          <Dithering
+            key={`${layer.colorFront}-${layer.rotation}`}
+            className="pointer-events-none absolute inset-0 size-full rounded-lg"
+            colorBack="#ffffff00"
+            colorFront={layer.colorFront}
+            shape="sphere"
+            rotation={layer.rotation}
+            type={type}
+            size={ditheringSize}
+            speed={1}
+            scale={scale}
+            style={{ zIndex: index }}
+          />
+        ))}
+      </div>
+
+      <div className="flex-1 pr-4">
+        <p className="text-foreground text-xs font-medium">{name}</p>
+        <p
+          className="h-4 overflow-hidden text-xs leading-4 text-muted-foreground"
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          <span
+            key={thinkingStep}
+            className={cn(
+              "block",
+              thinkingDirection === "increase" && "thinking-step-label-increase",
+              thinkingDirection === "decrease" && "thinking-step-label-decrease",
+            )}
+          >
+            {thinkingLabel}
+          </span>
+        </p>
+        <Slider
+          className="mt-1 border rounded-lg border-border"
+          aria-label={`${name} thinking quality`}
+          value={[thinkingStep]}
+          onValueChange={(value) => {
+            const nextValue = Array.isArray(value) ? value[0] : value;
+            const nextStep = Math.min(Math.max(Math.round(nextValue ?? 0), 0), MAX_THINKING_STEP);
+            const previousStep = previousThinkingStepRef.current;
+            if (nextStep === previousStep) {
+              return;
+            }
+            setThinkingDirection(nextStep > previousStep ? "increase" : "decrease");
+            previousThinkingStepRef.current = nextStep;
+            setThinkingStep(nextStep);
+          }}
+          min={0}
+          max={MAX_THINKING_STEP}
+          step={1}
+        />
+      </div>
+    </div>
+  );
+}
+
+function CustomModelPickerEmptyState() {
+  return (
+    <div className="flex flex-col gap-2 p-2 w-full">
+      {CUSTOM_MODEL_PICKERS.map((model) => (
+        <CustomModelPicker key={model.name} {...model} />
+      ))}
+    </div>
+  );
+}
+
 // Split a `${instanceId}:${slug}` combobox key back into its pieces. Slugs
 // can contain colons (e.g. some vendor model ids), so we only split on the
 // first colon — anything after that is the slug.
-function splitInstanceModelKey(key: string): { instanceId: ProviderInstanceId; slug: string } {
+function splitInstanceModelKey(key: string): {
+  instanceId: ProviderInstanceId;
+  slug: string;
+} {
   const colonIndex = key.indexOf(":");
   if (colonIndex === -1) {
     return { instanceId: key as ProviderInstanceId, slug: "" };
@@ -84,6 +270,8 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
    * model set but are free to diverge via customModels).
    */
   modelOptionsByInstance: ReadonlyMap<ProviderInstanceId, ReadonlyArray<ModelEsque>>;
+  /** Custom JSX rendered by the hardcoded custom group in the picker sidebar. */
+  customGroupContent?: ReactNode;
   terminalOpen: boolean;
   onRequestClose?: () => void;
   getModelDisabledReason?: (instanceId: ProviderInstanceId, model: string) => string | null;
@@ -103,16 +291,14 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
   const modelListRef = useRef<LegendListRef | null>(null);
   const highlightedModelKeyRef = useRef<string | null>(null);
   const favorites = useClientSettings((s) => s.favorites ?? []);
-  const [selectedInstanceId, setSelectedInstanceId] = useState<ProviderInstanceId | "favorites">(
-    () => {
-      if (props.lockedProvider !== null) {
-        // When locked, prime the sidebar to the currently-active instance
-        // so jumping into the picker keeps the focused instance visible.
-        return props.activeInstanceId;
-      }
-      return favorites.length > 0 ? "favorites" : props.activeInstanceId;
-    },
-  );
+  const [selectedInstanceId, setSelectedInstanceId] = useState<ModelPickerSelection>(() => {
+    if (props.lockedProvider !== null) {
+      // When locked, prime the sidebar to the currently-active instance
+      // so jumping into the picker keeps the focused instance visible.
+      return props.activeInstanceId;
+    }
+    return favorites.length > 0 ? "favorites" : props.activeInstanceId;
+  });
   const keybindings = useMemo<ResolvedKeybindingsConfig>(
     () => providedKeybindings ?? [],
     [providedKeybindings],
@@ -124,8 +310,11 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
   }, []);
 
   const handleSelectInstance = useCallback(
-    (instanceId: ProviderInstanceId | "favorites") => {
+    (instanceId: ModelPickerSelection) => {
       setSelectedInstanceId(instanceId);
+      if (instanceId === MODEL_PICKER_CUSTOM_GROUP_ID) {
+        setSearchQuery("");
+      }
       window.requestAnimationFrame(() => {
         focusSearchInput();
       });
@@ -258,6 +447,10 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
 
   // Filter models based on search query and selected instance
   const filteredModels = useMemo(() => {
+    if (selectedInstanceId === MODEL_PICKER_CUSTOM_GROUP_ID) {
+      return [];
+    }
+
     let result = flatModels;
 
     // Apply tokenized fuzzy search across the combined provider/model search fields.
@@ -361,6 +554,14 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
     searchQuery,
     selectedInstanceId,
   ]);
+
+  const isCustomGroup = selectedInstanceId === MODEL_PICKER_CUSTOM_GROUP_ID;
+  const customGroupContent =
+    props.customGroupContent === undefined ? (
+      <CustomModelPickerEmptyState />
+    ) : (
+      props.customGroupContent
+    );
 
   const handleModelSelect = useCallback(
     (modelSlug: string, instanceId: ProviderInstanceId) => {
@@ -597,7 +798,9 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
                     }
                     if (e.key === "Enter" && highlightedModelKeyRef.current) {
                       (
-                        e as typeof e & { preventBaseUIHandler?: () => void }
+                        e as typeof e & {
+                          preventBaseUIHandler?: () => void;
+                        }
                       ).preventBaseUIHandler?.();
                       e.preventDefault();
                       e.stopPropagation();
@@ -617,58 +820,64 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
               </div>
             </div>
 
-            {/* Model list */}
-            <div className="relative min-h-0 flex-1 overflow-hidden">
-              <ComboboxListVirtualized className="model-picker-list size-full min-w-0 p-0">
-                <LegendList<string>
-                  ref={modelListRef}
-                  data={filteredModelKeys}
-                  extraData={favoritesSet}
-                  keyExtractor={(modelKey) => modelKey}
-                  renderItem={({ item: modelKey, index }) => {
-                    const model = filteredModelByKey.get(modelKey);
-                    if (!model) {
-                      return null;
-                    }
-                    const disabledReason =
-                      getModelDisabledReason?.(model.instanceId, model.slug) ?? null;
-                    return (
-                      <ModelListRow
-                        key={modelKey}
-                        index={index}
-                        model={model}
-                        instanceId={model.instanceId}
-                        driverKind={model.driverKind}
-                        providerDisplayName={model.instanceDisplayName}
-                        providerAccentColor={model.instanceAccentColor}
-                        isFavorite={favoritesSet.has(modelKey)}
-                        isSelected={modelKey === `${props.activeInstanceId}:${props.model}`}
-                        showProvider
-                        preferShortName={!isLocked}
-                        useTriggerLabel={false}
-                        showNewBadge={isModelPickerNewModel(model.driverKind, model.slug)}
-                        jumpLabel={modelJumpLabelByKey.get(modelKey) ?? null}
-                        disabledReason={disabledReason}
-                        onToggleFavorite={() => toggleFavorite(model.instanceId, model.slug)}
-                      />
-                    );
-                  }}
-                  estimatedItemSize={60}
-                  drawDistance={480}
-                  recycleItems
-                  onLayout={updateModelListScrollFades}
-                  onScroll={updateModelListScrollFades}
-                  className={cn(
-                    "scrollbar-gutter-both h-full overflow-x-hidden overscroll-y-contain py-1.5 [--fade-size:1.5rem]",
-                    showTopScrollFade && "mask-t-from-[calc(100%-var(--fade-size))]",
-                    showBottomScrollFade && "mask-b-from-[calc(100%-var(--fade-size))]",
-                  )}
-                />
-              </ComboboxListVirtualized>
+            {/* Model list or custom group content */}
+            <div className={cn("relative min-h-0 flex-1 overflow-hidden", isCustomGroup && "flex")}>
+              {isCustomGroup ? (
+                <div className="flex min-h-0 flex-1 overflow-y-auto">{customGroupContent}</div>
+              ) : (
+                <>
+                  <ComboboxListVirtualized className="model-picker-list size-full min-w-0 p-0">
+                    <LegendList<string>
+                      ref={modelListRef}
+                      data={filteredModelKeys}
+                      extraData={favoritesSet}
+                      keyExtractor={(modelKey) => modelKey}
+                      renderItem={({ item: modelKey, index }) => {
+                        const model = filteredModelByKey.get(modelKey);
+                        if (!model) {
+                          return null;
+                        }
+                        const disabledReason =
+                          getModelDisabledReason?.(model.instanceId, model.slug) ?? null;
+                        return (
+                          <ModelListRow
+                            key={modelKey}
+                            index={index}
+                            model={model}
+                            instanceId={model.instanceId}
+                            driverKind={model.driverKind}
+                            providerDisplayName={model.instanceDisplayName}
+                            providerAccentColor={model.instanceAccentColor}
+                            isFavorite={favoritesSet.has(modelKey)}
+                            isSelected={modelKey === `${props.activeInstanceId}:${props.model}`}
+                            showProvider
+                            preferShortName={!isLocked}
+                            useTriggerLabel={false}
+                            showNewBadge={isModelPickerNewModel(model.driverKind, model.slug)}
+                            jumpLabel={modelJumpLabelByKey.get(modelKey) ?? null}
+                            disabledReason={disabledReason}
+                            onToggleFavorite={() => toggleFavorite(model.instanceId, model.slug)}
+                          />
+                        );
+                      }}
+                      estimatedItemSize={60}
+                      drawDistance={480}
+                      recycleItems
+                      onLayout={updateModelListScrollFades}
+                      onScroll={updateModelListScrollFades}
+                      className={cn(
+                        "scrollbar-gutter-both h-full overflow-x-hidden overscroll-y-contain py-1.5 [--fade-size:1.5rem]",
+                        showTopScrollFade && "mask-t-from-[calc(100%-var(--fade-size))]",
+                        showBottomScrollFade && "mask-b-from-[calc(100%-var(--fade-size))]",
+                      )}
+                    />
+                  </ComboboxListVirtualized>
+                  <ComboboxEmpty className="not-empty:py-6 empty:h-0 text-xs font-normal leading-snug">
+                    No models found
+                  </ComboboxEmpty>
+                </>
+              )}
             </div>
-            <ComboboxEmpty className="not-empty:py-6 empty:h-0 text-xs font-normal leading-snug">
-              No models found
-            </ComboboxEmpty>
           </div>
         </Combobox>
       </div>
