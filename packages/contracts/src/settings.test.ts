@@ -742,3 +742,67 @@ describe("ServerSettings environment icon", () => {
     expect(encodeServerSettings(linuxSettings).environmentIcon).toBe("linux");
   });
 });
+
+describe("ClientSettings custom backgrounds", () => {
+  const record = {
+    id: "bg-1",
+    name: "Sunset",
+    source: { kind: "image", imageId: "a".repeat(64) },
+    filter: { kind: "none" },
+    fade: 70,
+    createdAt: "2026-09-08T00:00:00.000Z",
+  };
+
+  it("defaults existing clients to an empty library with nothing active", () => {
+    const settings = decodeClientSettings({});
+    expect(settings.customBackgrounds).toEqual([]);
+    expect(settings.activeCustomBackgroundId).toBeNull();
+    expect(settings.customBackgroundInConversations).toBe(true);
+  });
+
+  it("persists the master switch independently of the selection and conversation preference", () => {
+    const settings = decodeClientSettings({
+      customBackgrounds: [record],
+      activeCustomBackgroundId: record.id,
+      customBackgroundEnabled: false,
+      customBackgroundInConversations: true,
+    });
+    expect(decodeClientSettings(encodeClientSettings(settings))).toEqual(settings);
+    expect(settings.customBackgroundEnabled).toBe(false);
+    expect(settings.activeCustomBackgroundId).toBe(record.id);
+    expect(settings.customBackgroundInConversations).toBe(true);
+    expect(
+      decodeClientSettingsPatch({ customBackgroundEnabled: true }).customBackgroundEnabled,
+    ).toBe(true);
+    expect(decodeClientSettings({}).customBackgroundEnabled).toBe(true);
+  });
+
+  it("keeps the selection when backgrounds are turned off in conversations", () => {
+    const settings = decodeClientSettings({
+      customBackgrounds: [record],
+      activeCustomBackgroundId: "bg-1",
+      customBackgroundInConversations: false,
+    });
+    expect(settings.activeCustomBackgroundId).toBe("bg-1");
+    expect(settings.customBackgroundInConversations).toBe(false);
+  });
+
+  it("round-trips a library and its active entry", () => {
+    const settings = decodeClientSettings({
+      customBackgrounds: [record],
+      activeCustomBackgroundId: "bg-1",
+    });
+    expect(decodeClientSettings(encodeClientSettings(settings))).toEqual(settings);
+    expect(
+      decodeClientSettingsPatch({ activeCustomBackgroundId: null }).activeCustomBackgroundId,
+    ).toBeNull();
+  });
+
+  it("rejects a record whose image id is not a hash", () => {
+    expect(() =>
+      decodeClientSettingsPatch({
+        customBackgrounds: [{ ...record, source: { kind: "image", imageId: "sunset.jpg" } }],
+      }),
+    ).toThrow();
+  });
+});

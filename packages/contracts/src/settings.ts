@@ -19,6 +19,7 @@ import {
 } from "./model.ts";
 import { ModelSelection, ProjectScript } from "./orchestration.ts";
 import { BrowserProfile, BrowserProfileId, DEFAULT_BROWSER_PROFILE_ID } from "./browserProfile.ts";
+import { CustomBackgroundId, CustomBackgroundRecords } from "./customBackground.ts";
 import {
   DEFAULT_PREVIEW_APPEARANCE,
   DEFAULT_PREVIEW_ZOOM_FACTOR,
@@ -274,6 +275,27 @@ export const LoadBalancingWeights = Schema.Record(
 export const ClientSettingsSchema = Schema.Struct({
   loadBalancingEnabled: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
   loadBalancingWeights: LoadBalancingWeights.pipe(Schema.withDecodingDefault(Effect.succeed({}))),
+  /**
+   * The client's background library. Image bytes live in the client's own
+   * image store; records only reference them. See `customBackground.ts`.
+   */
+  customBackgrounds: CustomBackgroundRecords.pipe(
+    Schema.withDecodingDefault(Effect.succeed<CustomBackgroundRecords>([])),
+  ),
+  /** Hides the background without discarding the selected entry or its settings. */
+  customBackgroundEnabled: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
+  /** Which library entry renders behind chats; null keeps the plain theme. */
+  activeCustomBackgroundId: Schema.NullOr(CustomBackgroundId).pipe(
+    Schema.withDecodingDefault(Effect.succeed(null)),
+  ),
+  /**
+   * Whether the active entry also draws behind threads that have messages.
+   * When backgrounds are enabled, drafts show the selected entry; this decides
+   * if it stays in conversations. Off keeps the selection.
+   */
+  customBackgroundInConversations: Schema.Boolean.pipe(
+    Schema.withDecodingDefault(Effect.succeed(true)),
+  ),
   appearanceContrast: AppearanceContrast.pipe(
     Schema.withDecodingDefault(Effect.succeed(DEFAULT_APPEARANCE_CONTRAST)),
   ),
@@ -1297,6 +1319,10 @@ export type ServerSettingsPatch = typeof ServerSettingsPatch.Type;
 export const ClientSettingsPatch = Schema.Struct({
   loadBalancingEnabled: Schema.optionalKey(Schema.Boolean),
   loadBalancingWeights: Schema.optionalKey(LoadBalancingWeights),
+  customBackgrounds: Schema.optionalKey(CustomBackgroundRecords),
+  customBackgroundEnabled: Schema.optionalKey(Schema.Boolean),
+  activeCustomBackgroundId: Schema.optionalKey(Schema.NullOr(CustomBackgroundId)),
+  customBackgroundInConversations: Schema.optionalKey(Schema.Boolean),
   appearanceContrast: Schema.optionalKey(AppearanceContrast),
   panelAnimationDurationMs: Schema.optionalKey(PanelAnimationDurationMs),
   browserDefaultViewport: Schema.optionalKey(PreviewViewportSetting),
