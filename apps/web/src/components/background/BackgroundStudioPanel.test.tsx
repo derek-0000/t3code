@@ -13,6 +13,7 @@ const state = vi.hoisted(() => ({
   settings: null as ClientSettings | null,
   listeners: new Set<() => void>(),
   upload: vi.fn(),
+  filtersAvailable: true,
 }));
 vi.mock("~/hooks/useSettings", async () => {
   const { useSyncExternalStore } = await import("react");
@@ -39,6 +40,9 @@ vi.mock("~/hooks/useSettings", async () => {
   };
 });
 vi.mock("~/customBackground/imageStore", () => ({ storeBackgroundImage: state.upload }));
+vi.mock("~/customBackground/webgl", () => ({
+  isWebGlAvailable: () => state.filtersAvailable,
+}));
 vi.mock("~/localApi", () => ({
   ensureLocalApi: () => ({ dialogs: { confirm: async () => true } }),
 }));
@@ -95,6 +99,7 @@ beforeEach(async () => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   vi.stubGlobal("window", new EventTarget());
   vi.useFakeTimers();
+  state.filtersAvailable = true;
   state.settings = {
     ...DEFAULT_CLIENT_SETTINGS,
     customBackgrounds: [original, other],
@@ -172,4 +177,15 @@ it("does not change the library after closing during encoding", async () => {
   await act(async () => renderer.unmount());
   await act(async () => finishUpload());
   expect(state.settings?.customBackgrounds).toEqual([original, other]);
+});
+
+it("disables the filter selector and explains when WebGL is missing", async () => {
+  state.filtersAvailable = false;
+  await act(async () => {
+    renderer.update(<BackgroundStudioPanel onClose={() => undefined} />);
+  });
+  expect(renderer.root.findByType("select").props.disabled).toBe(true);
+  expect(renderer.root.findByProps({ role: "status" }).children.join("")).toContain(
+    "Filters need WebGL",
+  );
 });

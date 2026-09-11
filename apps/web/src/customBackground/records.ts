@@ -1,6 +1,7 @@
 import {
   type CustomBackgroundFilter,
   type CustomBackgroundFilterKind,
+  type CustomBackgroundImageId,
   type CustomBackgroundRecord,
   DEFAULT_CUSTOM_BACKGROUND_FADE,
   defaultCustomBackgroundFilter,
@@ -63,8 +64,43 @@ export function nextActiveAfterRemove(activeId: string | null, removedId: string
   return activeId === removedId ? null : activeId;
 }
 
-export function backgroundIsRenderable(record: CustomBackgroundRecord): boolean {
-  return isGenerativeCustomBackgroundFilter(record.filter.kind) || record.source.kind === "image";
+export function backgroundUsesStoredImage(
+  record: CustomBackgroundRecord,
+  filtersAvailable: boolean,
+): record is CustomBackgroundRecord & {
+  source: { kind: "image"; imageId: CustomBackgroundImageId };
+} {
+  return (
+    record.source.kind === "image" &&
+    (!filtersAvailable || !isGenerativeCustomBackgroundFilter(record.filter.kind))
+  );
+}
+
+export function backgroundDrawMode({
+  filter,
+  hasImage,
+  filtersAvailable,
+}: {
+  filter: CustomBackgroundFilter;
+  hasImage: boolean;
+  filtersAvailable: boolean;
+}): "image" | "shader" | "none" {
+  if (filter.kind === "none" || !filtersAvailable) return hasImage ? "image" : "none";
+  if (isGenerativeCustomBackgroundFilter(filter.kind)) return "shader";
+  return hasImage ? "shader" : "none";
+}
+
+export function backgroundIsRenderable(
+  record: CustomBackgroundRecord,
+  filtersAvailable = true,
+): boolean {
+  return (
+    backgroundDrawMode({
+      filter: record.filter,
+      hasImage: record.source.kind === "image",
+      filtersAvailable,
+    }) !== "none"
+  );
 }
 
 export function filtersEqual(a: CustomBackgroundFilter, b: CustomBackgroundFilter): boolean {

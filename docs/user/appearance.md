@@ -20,6 +20,12 @@ The main sidebar, right panel, and terminal drawer open and close immediately by
 in your operating system. Moving between threads always snaps to the selected thread's panel state
 without replaying its transitions.
 
+## Custom background
+
+On web and desktop, open **Settings → Appearance → Custom background** to put a picture or
+gradient behind chats. Images stay on that browser or desktop app. See
+[Custom background](./custom-background.md).
+
 ## Custom themes
 
 On web and desktop, choose **Create theme** to adjust a palette, or import a T3 Code or VS Code

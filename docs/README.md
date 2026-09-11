@@ -10,6 +10,7 @@
 - [Source control](./user/source-control.md)
 - [Project settings](./user/project-settings.md)
 - [Appearance and themes](./user/appearance.md)
+- [Custom background](./user/custom-background.md)
 - [Keyboard shortcuts](./user/keybindings.md)
 - [SnapShots](./user/snap-shot.md)
 - [Import browser sessions](./user/browser-import.md)

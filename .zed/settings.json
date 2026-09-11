@@ -1,0 +1,58 @@
+{
+  "format_on_save": "on",
+  "formatter": [
+    {
+      "code_action": "source.fixAll.oxc"
+    },
+    {
+      "external": {
+        "command": "pnpm",
+        "arguments": ["exec", "oxfmt", "--stdin-filepath", "{buffer_path}"]
+      }
+    }
+  ],
+  "tab_size": 2,
+  "hard_tabs": false,
+  "auto_install_extensions": {
+    "oxc": true
+  },
+  "file_scan_exclusions": [
+    "**/.git",
+    "**/.svn",
+    "**/.hg",
+    "**/.jj",
+    "**/CVS",
+    "**/.DS_Store",
+    "**/Thumbs.db",
+    "**/.classpath",
+    "**/.settings",
+    "**/.repos"
+  ],
+  "lsp": {
+    "oxlint": {
+      "initialization_options": {
+        "settings": {
+          "unusedDisableDirectives": "warn"
+        }
+      }
+    },
+    "vtsls": {
+      "settings": {
+        "javascript": {
+          "preferences": {
+            "autoImportFileExcludePatterns": [".repos/**"]
+          }
+        },
+        "typescript": {
+          "tsdk": "node_modules/typescript/lib",
+          "preferences": {
+            "autoImportFileExcludePatterns": [".repos/**"]
+          }
+        },
+        "vtsls": {
+          "autoUseWorkspaceTsdk": true
+        }
+      }
+    }
+  }
+}

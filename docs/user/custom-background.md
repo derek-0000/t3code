@@ -33,8 +33,8 @@ to pick the frame instead of animating.
 - Gradient filters: Mesh gradient and Grain gradient paint the whole picture themselves and
   ignore the image.
 
-Filters need WebGL. In a browser without it the background renders nothing, and the studio
-controller says so.
+Filters need WebGL. In a browser without it the controller says so and turns the filter
+selector off. A picture still shows without a filter; gradient-only backgrounds draw nothing.
 
 ## Fade
 

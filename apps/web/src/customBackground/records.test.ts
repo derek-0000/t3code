@@ -3,7 +3,9 @@ import { describe, expect, it } from "vite-plus/test";
 import { type CustomBackgroundRecord, defaultCustomBackgroundFilter } from "@t3tools/contracts";
 
 import {
+  backgroundDrawMode,
   backgroundIsRenderable,
+  backgroundUsesStoredImage,
   createGenerativeBackground,
   filtersEqual,
   nextActiveAfterRemove,
@@ -72,6 +74,28 @@ describe("images", () => {
     expect(backgroundIsRenderable(sunset)).toBe(true);
     expect(backgroundIsRenderable(mesh)).toBe(true);
     expect(backgroundIsRenderable({ ...sunset, source: { kind: "none" } })).toBe(false);
+  });
+
+  it("draws the photo without a filter when shaders cannot run", () => {
+    expect(
+      backgroundDrawMode({
+        filter: sunset.filter,
+        hasImage: true,
+        filtersAvailable: false,
+      }),
+    ).toBe("image");
+    expect(
+      backgroundDrawMode({
+        filter: mesh.filter,
+        hasImage: false,
+        filtersAvailable: false,
+      }),
+    ).toBe("none");
+    expect(backgroundIsRenderable(sunset, false)).toBe(true);
+    expect(backgroundIsRenderable(mesh, false)).toBe(false);
+    expect(backgroundUsesStoredImage(sunset, false)).toBe(true);
+    expect(backgroundUsesStoredImage({ ...mesh, source: sunset.source }, true)).toBe(false);
+    expect(backgroundUsesStoredImage({ ...mesh, source: sunset.source }, false)).toBe(true);
   });
 });
 

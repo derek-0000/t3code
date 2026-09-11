@@ -24,6 +24,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useBackgroundStudioStore } from "~/customBackground/backgroundStudioStore";
 import { storeBackgroundImage } from "~/customBackground/imageStore";
+import { isWebGlAvailable } from "~/customBackground/webgl";
 import {
   type CustomBackgroundLibrary,
   createGenerativeBackground,
@@ -406,6 +407,7 @@ export function BackgroundStudioPanel({ onClose }: { onClose: () => void }) {
     return ids;
   }, [library]);
 
+  const filtersAvailable = isWebGlAvailable();
   const filterIsDefault =
     record !== null &&
     filtersEqual(record.filter, defaultCustomBackgroundFilter(record.filter.kind));
@@ -544,7 +546,7 @@ export function BackgroundStudioPanel({ onClose }: { onClose: () => void }) {
                       }
                     />
                   </div>
-                  {!isGenerativeCustomBackgroundFilter(record.filter.kind) ? (
+                  {!isGenerativeCustomBackgroundFilter(record.filter.kind) || !filtersAvailable ? (
                     <BackgroundImagePicker
                       selectedImageId={
                         record.source.kind === "image" ? record.source.imageId : null
@@ -585,12 +587,18 @@ export function BackgroundStudioPanel({ onClose }: { onClose: () => void }) {
                   ) : null}
 
                   <h3 className="text-[13px] font-medium">Filter</h3>
+                  {!filtersAvailable ? (
+                    <p role="status" className="text-xs text-muted-foreground">
+                      Filters need WebGL to be active.
+                    </p>
+                  ) : null}
                   <div className="shrink-0">
                     <div className="flex items-center gap-3">
                       <span className="w-28 shrink-0 text-[13px] text-muted-foreground">
                         Filter
                       </span>
                       <Select
+                        disabled={!filtersAvailable}
                         value={record.filter.kind}
                         onValueChange={(kind) => {
                           if (isFilterKind(kind)) commitRecord(withFilterKind(record, kind));
@@ -619,7 +627,7 @@ export function BackgroundStudioPanel({ onClose }: { onClose: () => void }) {
                           ))}
                         </SelectPopup>
                       </Select>
-                      {!filterIsDefault && record.filter.kind !== "none" ? (
+                      {filtersAvailable && !filterIsDefault && record.filter.kind !== "none" ? (
                         <Tooltip>
                           <TooltipTrigger
                             render={
@@ -665,15 +673,17 @@ export function BackgroundStudioPanel({ onClose }: { onClose: () => void }) {
                     }
                   />
 
-                  <BackgroundControls
-                    filter={record.filter}
-                    onChange={(filter) =>
-                      commitRecord({
-                        ...record,
-                        filter,
-                      })
-                    }
-                  />
+                  {filtersAvailable ? (
+                    <BackgroundControls
+                      filter={record.filter}
+                      onChange={(filter) =>
+                        commitRecord({
+                          ...record,
+                          filter,
+                        })
+                      }
+                    />
+                  ) : null}
                 </div>
               </ScrollArea>
             ) : (

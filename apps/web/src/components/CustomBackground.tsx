@@ -1,4 +1,3 @@
-import { isGenerativeCustomBackgroundFilter } from "@t3tools/contracts";
 import { lazy, memo, Suspense } from "react";
 
 import { useBackgroundStudioStore } from "~/customBackground/backgroundStudioStore";
@@ -7,9 +6,11 @@ import { useBackgroundImageUrl } from "~/customBackground/imageStore";
 import {
   type CustomBackgroundRouteKind,
   backgroundIsRenderable,
+  backgroundUsesStoredImage,
   resolveDisplayedBackground,
 } from "~/customBackground/records";
 import { useActiveBackground } from "~/customBackground/useActiveBackground";
+import { isWebGlAvailable } from "~/customBackground/webgl";
 
 // The shader library only loads once a client actually has a background
 // selected, so clients on the plain theme never pay for it at startup.
@@ -37,12 +38,13 @@ export const CustomBackground = memo(function CustomBackground({
     routeKind,
     inConversations,
   });
+  const filtersAvailable = isWebGlAvailable();
   const imageId =
-    record?.source.kind === "image" && !isGenerativeCustomBackgroundFilter(record.filter.kind)
+    record !== null && backgroundUsesStoredImage(record, filtersAvailable)
       ? record.source.imageId
       : null;
   const image = useBackgroundImageUrl(imageId);
-  if (!record || !backgroundIsRenderable(record)) return null;
+  if (!record || !backgroundIsRenderable(record, filtersAvailable)) return null;
   if (imageId !== null && typeof image !== "string") return null;
   return (
     <div className="pointer-events-none absolute inset-0 -z-10">
@@ -51,6 +53,7 @@ export const CustomBackground = memo(function CustomBackground({
           filter={record.filter}
           image={typeof image === "string" ? image : null}
           fade={record.fade}
+          filtersAvailable={filtersAvailable}
         />
       </Suspense>
     </div>

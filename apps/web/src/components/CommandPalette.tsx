@@ -1700,7 +1700,7 @@ function OpenCommandPaletteDialog(props: {
       "gradient",
       "studio",
     ],
-    title: "Toggle background editor",
+    title: "Customize background",
     icon: <ImageIcon className={ITEM_ICON_CLASS} />,
     shortcutCommand: "backgroundEditor.toggle",
     run: async () => {

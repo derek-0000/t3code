@@ -8,23 +8,14 @@ import {
 import type { CustomBackgroundFilter } from "@t3tools/contracts";
 import { memo } from "react";
 
-import { isWebGlAvailable } from "~/customBackground/webgl";
-
-// Every shader renders one frame (speed 0) and never repaints on its own.
-// Without preserveDrawingBuffer the browser drops the drawing buffer after
-// compositing, so any layer churn around the canvas (route swaps, the draft
-// hero collapsing into a thread) re-composites a blank canvas for a frame.
-const WEBGL_CONTEXT_ATTRIBUTES: WebGLContextAttributes = {
-  preserveDrawingBuffer: true,
-  antialias: false,
-  depth: false,
-};
+import { BACKGROUND_WEBGL_CONTEXT_ATTRIBUTES } from "~/customBackground/webgl";
+import { backgroundDrawMode } from "~/customBackground/records";
 
 // Cap GPU work on high-resolution displays; the background sits under a fade.
 const MAX_PIXEL_COUNT = 1920 * 1200;
 
 const SHADER_PROPS = {
-  webGlContextAttributes: WEBGL_CONTEXT_ATTRIBUTES,
+  webGlContextAttributes: BACKGROUND_WEBGL_CONTEXT_ATTRIBUTES,
   width: "100%",
   height: "100%",
   speed: 0,
@@ -80,26 +71,29 @@ export interface BackgroundRendererProps {
   /** Object URL of the source image; null for generative filters or while loading. */
   image: string | null;
   fade: number;
+  /** When false, skip Paper entirely and draw the photo if one is loaded. */
+  filtersAvailable: boolean;
 }
 
 export const BackgroundRenderer = memo(function BackgroundRenderer({
   filter,
   image,
   fade,
+  filtersAvailable,
 }: BackgroundRendererProps) {
-  if (filter.kind === "none") {
-    if (!image) return null;
-    return (
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
-        <img src={image} alt="" className="absolute size-full object-cover" />
-        <div className="absolute inset-0" style={fadeOverlayStyle(fade)} />
-      </div>
-    );
-  }
-  if (!isWebGlAvailable()) return null;
+  const mode = backgroundDrawMode({
+    filter,
+    hasImage: typeof image === "string",
+    filtersAvailable,
+  });
+  if (mode === "none") return null;
   return (
     <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
-      <ShaderLayer filter={filter} image={image} />
+      {mode === "image" && typeof image === "string" ? (
+        <img src={image} alt="" className="absolute size-full object-cover" />
+      ) : (
+        <ShaderLayer filter={filter} image={image} />
+      )}
       <div className="absolute inset-0" style={fadeOverlayStyle(fade)} />
     </div>
   );
