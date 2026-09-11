@@ -47,7 +47,7 @@ export const CustomBackground = memo(function CustomBackground({
   if (!record || !backgroundIsRenderable(record, filtersAvailable)) return null;
   if (imageId !== null && typeof image !== "string") return null;
   return (
-    <div className="pointer-events-none absolute inset-0 -z-10">
+    <div data-chat-backdrop="source" className="pointer-events-none absolute inset-0 -z-10">
       <Suspense fallback={null}>
         <BackgroundRenderer
           filter={record.filter}

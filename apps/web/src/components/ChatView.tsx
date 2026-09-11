@@ -1,4 +1,5 @@
 import { CustomBackground } from "./CustomBackground";
+import { ChatTopbarBlur } from "./chat/ChatTopbarBlur";
 import { useLoadBalancedEnvironment } from "../hooks/useLoadBalancedEnvironment";
 import type { UsageLimitSourceSnapshots } from "@t3tools/contracts";
 import {
@@ -8373,8 +8374,12 @@ export default function ChatView(props: ChatViewProps) {
   });
 
   return (
-    <div className="relative isolate flex min-h-0 min-w-0 flex-1 overflow-hidden">
+    <div
+      data-chat-background-pane
+      className="relative isolate flex min-h-0 min-w-0 flex-1 overflow-hidden"
+    >
       <CustomBackground routeKind={isDraftHeroState ? "draft" : "conversation"} />
+      <ChatTopbarBlur />
       <Dialog
         open={
           deviceSetupThread !== null &&
@@ -8401,7 +8406,7 @@ export default function ChatView(props: ChatViewProps) {
       {rightPanelControlsAtRoot ? panelLayoutControls : null}
       <div
         className={cn(
-          "relative isolate flex min-h-0 min-w-0 flex-col overflow-x-hidden",
+          "relative flex min-h-0 min-w-0 flex-col overflow-x-hidden",
           rightPanelMaximized ? "w-0 flex-none" : "flex-1",
         )}
         data-chat-column-maximized-away={rightPanelMaximized ? "true" : "false"}
