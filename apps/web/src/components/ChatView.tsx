@@ -8411,7 +8411,7 @@ export default function ChatView(props: ChatViewProps) {
           data-chat-header
           electron={isElectron}
           reserveNativeControls={reserveTitleBarControlInset && !inlineRightPanelOwnsTitleBar}
-          className={cn("relative bg-transparent")}
+          className="relative bg-transparent"
         >
           {isElectron && rightPanelControlsAtRoot ? (
             <span
