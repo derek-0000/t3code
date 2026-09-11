@@ -850,6 +850,19 @@ export function ThreadTerminalRouteScreen(props: ThreadTerminalRouteScreenProps)
     [navigation, selectedThread, terminalId],
   );
 
+  const handleCloseTerminal = useCallback(() => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
+    navigation.dispatch(
+      StackActions.replace("Thread", {
+        environmentId: params.environmentId,
+        threadId: params.threadId,
+      }),
+    );
+  }, [navigation, params.environmentId, params.threadId]);
+
   const navigateAwayAfterExit = useCallback(() => {
     // With other shells still live, fall through to the previous one instead
     // of dropping the user back on the thread.
@@ -995,14 +1008,16 @@ export function ThreadTerminalRouteScreen(props: ThreadTerminalRouteScreenProps)
           },
         ],
       },
-      ...terminalMenuSessions.map((session): MenuAction => ({
-        id: `terminal-session:${session.terminalId}`,
-        title: session.displayLabel,
-        subtitle: [getTerminalStatusLabel({ status: session.status }), basename(session.cwd)]
-          .filter(Boolean)
-          .join(" · "),
-        state: session.terminalId === terminalId ? ("on" as const) : undefined,
-      })),
+      ...terminalMenuSessions.map(
+        (session): MenuAction => ({
+          id: `terminal-session:${session.terminalId}`,
+          title: session.displayLabel,
+          subtitle: [getTerminalStatusLabel({ status: session.status }), basename(session.cwd)]
+            .filter(Boolean)
+            .join(" · "),
+          state: session.terminalId === terminalId ? ("on" as const) : undefined,
+        }),
+      ),
       {
         id: "terminal-new",
         title: "Open new terminal",
@@ -1143,7 +1158,7 @@ export function ThreadTerminalRouteScreen(props: ThreadTerminalRouteScreenProps)
         <AndroidScreenHeader
           title="Terminal"
           subtitle={headerSubtitle}
-          onBack={navigation.canGoBack() ? () => navigation.goBack() : undefined}
+          onBack={handleCloseTerminal}
           trailing={
             <>
               {layout.usesSplitView ? (
@@ -1179,6 +1194,12 @@ export function ThreadTerminalRouteScreen(props: ThreadTerminalRouteScreenProps)
 
       {layout.usesSplitView ? (
         <NativeHeaderToolbar placement="left">
+          <NativeHeaderToolbar.Button
+            accessibilityLabel="Close terminal"
+            icon="xmark"
+            onPress={handleCloseTerminal}
+            separateBackground
+          />
           <NativeHeaderToolbar.Button
             accessibilityLabel={panes.primarySidebarVisible ? "Maximize terminal" : "Show threads"}
             icon={
