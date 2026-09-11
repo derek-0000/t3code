@@ -84,6 +84,12 @@ it.effect("parses keybinding rules", () =>
     });
     assert.strictEqual(parsedThemeEditor.command, "themeEditor.toggle");
 
+    const parsedBackgroundEditor = yield* decode(KeybindingRule, {
+      key: "mod+alt+shift+b",
+      command: "backgroundEditor.toggle",
+    });
+    assert.strictEqual(parsedBackgroundEditor.command, "backgroundEditor.toggle");
+
     const parsedLocal = yield* decode(KeybindingRule, {
       key: "mod+shift+n",
       command: "chat.newLocal",

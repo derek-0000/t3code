@@ -76,6 +76,14 @@ export const SETTINGS_SEARCH_ITEMS = [
     ],
   },
   {
+    id: "custom-background",
+    title: "Custom background",
+    to: "/settings/appearance",
+    searchTerms: [
+      "image wallpaper dithering photo shader filter gradient customize toggle show hide",
+    ],
+  },
+  {
     id: "color-scheme",
     title: "Color scheme",
     to: "/settings/appearance",

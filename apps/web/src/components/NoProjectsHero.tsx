@@ -2,6 +2,7 @@ import { PlusIcon } from "lucide-react";
 import { useCallback } from "react";
 
 import { openCommandPalette } from "../commandPaletteBus";
+import { CustomBackground } from "./CustomBackground";
 import { Button } from "./ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "./ui/empty";
 import { SidebarInset } from "./ui/sidebar";
@@ -10,8 +11,9 @@ export function NoProjectsHero() {
   const openAddProject = useCallback(() => openCommandPalette({ open: "add-project" }), []);
 
   return (
-    <SidebarInset className="h-dvh min-h-0 overflow-hidden overscroll-y-none bg-background text-foreground">
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden bg-background">
+    <SidebarInset className="relative isolate h-dvh min-h-0 overflow-hidden overscroll-y-none bg-transparent text-foreground">
+      <CustomBackground routeKind="draft" />
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden bg-transparent">
         <Empty className="flex-1">
           <div className="w-full max-w-lg px-8 py-12">
             <EmptyHeader className="max-w-none">

@@ -1,0 +1,58 @@
+import { isGenerativeCustomBackgroundFilter } from "@t3tools/contracts";
+import { lazy, memo, Suspense } from "react";
+
+import { useBackgroundStudioStore } from "~/customBackground/backgroundStudioStore";
+import { useClientSettings } from "~/hooks/useSettings";
+import { useBackgroundImageUrl } from "~/customBackground/imageStore";
+import {
+  type CustomBackgroundRouteKind,
+  backgroundIsRenderable,
+  resolveDisplayedBackground,
+} from "~/customBackground/records";
+import { useActiveBackground } from "~/customBackground/useActiveBackground";
+
+// The shader library only loads once a client actually has a background
+// selected, so clients on the plain theme never pay for it at startup.
+const BackgroundRenderer = lazy(() =>
+  import("./background/BackgroundRenderer").then((module) => ({
+    default: module.BackgroundRenderer,
+  })),
+);
+
+export const CustomBackground = memo(function CustomBackground({
+  routeKind,
+}: {
+  routeKind: CustomBackgroundRouteKind;
+}) {
+  const inConversations = useClientSettings((settings) => settings.customBackgroundInConversations);
+  const selected = useActiveBackground();
+  const enabled = useClientSettings((settings) => settings.customBackgroundEnabled);
+  const editing = useBackgroundStudioStore((store) => store.open);
+  const preview = useBackgroundStudioStore((store) => store.preview);
+  const record = resolveDisplayedBackground({
+    selected,
+    preview,
+    enabled,
+    editing,
+    routeKind,
+    inConversations,
+  });
+  const imageId =
+    record?.source.kind === "image" && !isGenerativeCustomBackgroundFilter(record.filter.kind)
+      ? record.source.imageId
+      : null;
+  const image = useBackgroundImageUrl(imageId);
+  if (!record || !backgroundIsRenderable(record)) return null;
+  if (imageId !== null && typeof image !== "string") return null;
+  return (
+    <div className="pointer-events-none absolute inset-0 -z-10">
+      <Suspense fallback={null}>
+        <BackgroundRenderer
+          filter={record.filter}
+          image={typeof image === "string" ? image : null}
+          fade={record.fade}
+        />
+      </Suspense>
+    </div>
+  );
+});

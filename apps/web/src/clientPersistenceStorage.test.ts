@@ -1,5 +1,7 @@
-import { DEFAULT_CLIENT_SETTINGS } from "@t3tools/contracts";
+import { DEFAULT_CLIENT_SETTINGS, defaultCustomBackgroundFilter } from "@t3tools/contracts";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
+
+import { createGenerativeBackground } from "./customBackground/records";
 
 function createLocalStorageStub(): Storage {
   const store = new Map<string, string>();
@@ -70,7 +72,37 @@ describe("clientPersistenceStorage", () => {
     },
   );
 
-  it("preserves saved settings across a transient read failure", async () => {
+  it.each([
+    { enabled: false, inConversations: false },
+    { enabled: false, inConversations: true },
+    { enabled: true, inConversations: false },
+    { enabled: true, inConversations: true },
+  ])("keeps background visibility after reload: %j", async ({ enabled, inConversations }) => {
+    getTestWindow();
+    const { writeBrowserClientSettings } = await import("./clientPersistenceStorage");
+    const record = createGenerativeBackground({
+      id: "saved-background",
+      name: "Mesh",
+      filter: defaultCustomBackgroundFilter("static-mesh-gradient"),
+      createdAt: "2026-09-08T00:00:00.000Z",
+    });
+    const settings = {
+      ...DEFAULT_CLIENT_SETTINGS,
+      customBackgrounds: [record],
+      activeCustomBackgroundId: record.id,
+      customBackgroundEnabled: enabled,
+      customBackgroundInConversations: inConversations,
+    };
+    writeBrowserClientSettings(settings);
+
+    // Reload modules while keeping the browser's persisted storage.
+    vi.resetModules();
+    const { readBrowserClientSettings } = await import("./clientPersistenceStorage");
+    const reloaded = readBrowserClientSettings();
+    expect(reloaded).toEqual(settings);
+  });
+
+  it("reports structured decode failures while preserving the fallback", async () => {
     const testWindow = getTestWindow();
     const settings = { ...DEFAULT_CLIENT_SETTINGS, timestampFormat: "12-hour" as const };
     testWindow.localStorage.setItem("t3code:client-settings:v1", JSON.stringify(settings));

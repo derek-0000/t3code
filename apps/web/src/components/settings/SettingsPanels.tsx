@@ -159,6 +159,7 @@ import {
   useSettingsSearchTargetId,
 } from "./settingsLayout";
 import { searchableSetting } from "./settingsSearch";
+import { CustomBackgroundSettings } from "./CustomBackgroundSettings";
 import { ProjectFavicon } from "../ProjectFavicon";
 import { PanelAnimationsPreview } from "./PanelAnimationsPreview";
 
@@ -502,6 +503,11 @@ export function useSettingsRestore(onRestored?: () => void) {
       ...(theme !== "system" ? ["Theme"] : []),
       ...(!followSystem ? ["Follow system"] : []),
       ...(themeHalves !== null ? ["Theme mix"] : []),
+      ...(settings.activeCustomBackgroundId !== null ||
+      !settings.customBackgroundEnabled ||
+      !settings.customBackgroundInConversations
+        ? ["Custom background"]
+        : []),
       ...(settings.appearanceContrast !== DEFAULT_UNIFIED_SETTINGS.appearanceContrast
         ? ["Contrast"]
         : []),
@@ -597,6 +603,9 @@ export function useSettingsRestore(onRestored?: () => void) {
       settings.browserLinkTarget,
       settings.browserAutoShowFloatingPreview,
       settings.appearanceContrast,
+      settings.activeCustomBackgroundId,
+      settings.customBackgroundEnabled,
+      settings.customBackgroundInConversations,
       settings.enableAgentBrowserAccess,
       settings.confirmQuit,
       settings.confirmThreadArchive,
@@ -700,6 +709,10 @@ export function useSettingsRestore(onRestored?: () => void) {
       return;
     }
     updateSettings({
+      // Only the selection resets; the background library is user content.
+      activeCustomBackgroundId: null,
+      customBackgroundEnabled: true,
+      customBackgroundInConversations: true,
       appearanceContrast: DEFAULT_UNIFIED_SETTINGS.appearanceContrast,
       timestampFormat: DEFAULT_UNIFIED_SETTINGS.timestampFormat,
       wordWrap: DEFAULT_UNIFIED_SETTINGS.wordWrap,
@@ -1099,6 +1112,8 @@ export function AppearanceSettingsPanel() {
           />
         </div>
       </SettingsSection>
+
+      <CustomBackgroundSettings />
 
       <SettingsSection id="appearance-interface" title="Interface">
         <SettingsRow

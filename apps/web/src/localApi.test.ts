@@ -156,9 +156,25 @@ describe("LocalApi", () => {
     const settings = {
       ...DEFAULT_CLIENT_SETTINGS,
       timestampFormat: "12-hour" as const,
+      customBackgrounds: [
+        {
+          id: "bg-1",
+          name: "Sunset",
+          source: { kind: "image" as const, imageId: "a".repeat(64) },
+          filter: { kind: "none" as const },
+          fade: 100,
+          createdAt: "2026-09-08T00:00:00.000Z",
+        },
+      ],
+      activeCustomBackgroundId: "bg-1",
     };
 
     await api.persistence.setClientSettings(settings);
     await expect(api.persistence.getClientSettings()).resolves.toEqual(settings);
+    await api.persistence.setClientSettings({ ...settings, activeCustomBackgroundId: null });
+    await expect(api.persistence.getClientSettings()).resolves.toEqual({
+      ...settings,
+      activeCustomBackgroundId: null,
+    });
   });
 });

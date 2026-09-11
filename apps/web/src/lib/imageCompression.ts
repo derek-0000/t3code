@@ -437,6 +437,94 @@ export async function compressImageToByteLimit(
   };
 }
 
+export interface ReencodedImage {
+  blob: Blob;
+  mimeType: string;
+  width: number;
+  height: number;
+}
+
+export type ReencodeImageResult =
+  | { ok: true; image: ReencodedImage }
+  | { ok: false; reason: ImageCompressionFailureReason };
+
+async function canvasToBlob(
+  canvas: OffscreenCanvas | HTMLCanvasElement,
+  mimeType: string,
+  quality: number,
+): Promise<Blob | null> {
+  if ("convertToBlob" in canvas) {
+    return canvas.convertToBlob({ type: mimeType, quality });
+  }
+  return new Promise((resolve) => canvas.toBlob(resolve, mimeType, quality));
+}
+
+/** Re-encodes even small uploads to WebP, or JPEG when the browser lacks a WebP encoder. */
+export async function reencodeImage(
+  file: File,
+  options: { maxDimension: number; maxBytes: number },
+): Promise<ReencodeImageResult> {
+  if (file.size > MAX_COMPRESSIBLE_SOURCE_BYTES) {
+    return { ok: false, reason: "too-large" };
+  }
+  if (!canRecompress()) {
+    return { ok: false, reason: "unreadable" };
+  }
+
+  let source: Blob = file;
+  if (isHeicImageFile(file)) {
+    try {
+      const dimensionError = await validateHeicImageDimensions(file);
+      if (dimensionError) return { ok: false, reason: dimensionError };
+      const { heicTo } = await import("heic-to/csp");
+      source = await heicTo({ blob: file, type: "image/jpeg", quality: QUALITY_STEPS[0] });
+    } catch {
+      return { ok: false, reason: "unreadable" };
+    }
+  }
+
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await createImageBitmap(source);
+  } catch {
+    return { ok: false, reason: "unreadable" };
+  }
+
+  try {
+    const baseDimension = Math.min(options.maxDimension, Math.max(bitmap.width, bitmap.height));
+    let mimeType: "image/webp" | "image/jpeg" | null = null;
+    for (const dimensionScale of [1, ...FALLBACK_SCALE_STEPS]) {
+      const targetDimension = Math.max(1, Math.round(baseDimension * dimensionScale));
+      const scale = targetDimension / Math.max(bitmap.width, bitmap.height);
+      const width = Math.max(1, Math.round(bitmap.width * scale));
+      const height = Math.max(1, Math.round(bitmap.height * scale));
+      const target = createCanvas(width, height);
+      if (!target) return { ok: false, reason: "unreadable" };
+      if (mimeType === null) {
+        const probe = await canvasToBlob(target.canvas, "image/webp", QUALITY_STEPS[0]);
+        mimeType = probe?.type === "image/webp" ? "image/webp" : "image/jpeg";
+      }
+      if (mimeType === "image/jpeg") {
+        target.context.fillStyle = "#ffffff";
+        target.context.fillRect(0, 0, width, height);
+      }
+      target.context.drawImage(bitmap, 0, 0, width, height);
+      for (const quality of QUALITY_STEPS) {
+        const blob = await canvasToBlob(target.canvas, mimeType, quality);
+        if (!blob || blob.type !== mimeType) return { ok: false, reason: "unreadable" };
+        if (blob.size <= options.maxBytes) {
+          return { ok: true, image: { blob, mimeType, width, height } };
+        }
+      }
+    }
+    return { ok: false, reason: "too-large" };
+  } catch {
+    return { ok: false, reason: "unreadable" };
+  } finally {
+    bitmap.close();
+  }
+}
+
 /**
  * Converts HEIC/HEIF photos to provider-compatible JPEG before applying the
  * attachment size limit. The decoder is loaded only when such a photo arrives.
