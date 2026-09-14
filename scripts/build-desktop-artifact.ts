@@ -4,6 +4,7 @@
 import * as NodeFSP from "node:fs/promises";
 import * as NodeCrypto from "node:crypto";
 import * as NodeModule from "node:module";
+import * as NodePath from "node:path";
 
 import {
   createPackageWithOptions,
@@ -466,6 +467,17 @@ export class DesktopIconSourceMissingError extends Schema.TaggedError<DesktopIco
 ) {
   override get message(): string {
     return `Desktop ${desktopIconPlatformNames[this.platform]} icon source is missing at ${this.sourcePath}`;
+  }
+}
+
+export class WorkspaceVpMissingError extends Schema.TaggedError<WorkspaceVpMissingError>()(
+  "WorkspaceVpMissingError",
+  {
+    executablePath: Schema.String,
+  },
+) {
+  override get message(): string {
+    return `Workspace vp is missing at ${this.executablePath}. Run \`vp i\` from the repository root.`;
   }
 }
 
@@ -953,6 +965,31 @@ interface StagePackageJson {
 }
 
 export const STAGE_INSTALL_ARGS = ["install", "--prod"] as const;
+
+export function resolveWorkspaceNodeBinDir(repoRoot: string): string {
+  return NodePath.resolve(repoRoot, "node_modules", ".bin");
+}
+
+export function resolveWorkspaceVpExecutable(repoRoot: string, platform: NodeJS.Platform): string {
+  const binDir = resolveWorkspaceNodeBinDir(repoRoot);
+  return platform === "win32" ? NodePath.join(binDir, "vp.cmd") : NodePath.join(binDir, "vp");
+}
+
+export function withWorkspaceNodeBinOnPath(
+  repoRoot: string,
+  env: NodeJS.ProcessEnv,
+): NodeJS.ProcessEnv {
+  const binDir = resolveWorkspaceNodeBinDir(repoRoot);
+  const currentPath = env.PATH ?? env.Path ?? "";
+  const entries = currentPath.split(NodePath.delimiter).filter((entry) => entry.length > 0);
+  if (entries.includes(binDir)) {
+    return env;
+  }
+  return {
+    ...env,
+    PATH: currentPath.length > 0 ? `${binDir}${NodePath.delimiter}${currentPath}` : binDir,
+  };
+}
 export const DESKTOP_ELECTRON_LANGUAGES = ["en-US"] as const;
 export const DESKTOP_FILE_EXCLUSIONS = [
   // T3 Code always passes the user's installed Claude executable to the SDK,
@@ -1726,6 +1763,32 @@ const runCommand = Effect.fn("runCommand")(function* (
       ...(stderr.trim() ? { stderrTail: stderr } : {}),
     });
   }
+});
+
+const runWorkspaceVp = Effect.fn("runWorkspaceVp")(function* (input: {
+  readonly repoRoot: string;
+  readonly args: ReadonlyArray<string>;
+  readonly cwd: string;
+  readonly label: string;
+  readonly verbose: boolean;
+  readonly env?: NodeJS.ProcessEnv;
+}) {
+  const platform = yield* HostProcessPlatform;
+  const fs = yield* FileSystem.FileSystem;
+  const executable = resolveWorkspaceVpExecutable(input.repoRoot, platform);
+  if (!(yield* fs.exists(executable))) {
+    return yield* new WorkspaceVpMissingError({ executablePath: executable });
+  }
+  const env = withWorkspaceNodeBinOnPath(input.repoRoot, input.env ?? process.env);
+  const spawnCommand = yield* resolveSpawnCommand(executable, input.args, { env });
+  yield* runCommand(
+    ChildProcess.make(spawnCommand.command, spawnCommand.args, {
+      cwd: input.cwd,
+      env,
+      shell: spawnCommand.shell,
+    }),
+    { label: input.label, verbose: input.verbose },
+  );
 });
 
 const desktopBuildProbeSucceeds = Effect.fn("desktopBuildProbeSucceeds")(function* (
@@ -2608,6 +2671,15 @@ export function resolveDesktopWebAssetBrand(version: string): WebAssetBrand {
 }
 
 export function resolveDesktopBuildIconAssets(version: string): DesktopBuildIconAssets {
+  // Set T3CODE_DESKTOP_ICON_BRAND=development to ship the blueprint icon.
+  if (process.env.T3CODE_DESKTOP_ICON_BRAND === "development") {
+    return {
+      macIconPng: BRAND_ASSET_PATHS.developmentDesktopIconPng,
+      linuxIconPng: BRAND_ASSET_PATHS.developmentUniversalIconPng,
+      windowsIconIco: BRAND_ASSET_PATHS.developmentWindowsIconIco,
+    };
+  }
+
   if (resolveDesktopUpdateChannel(version) === "nightly") {
     return {
       macIconPng: BRAND_ASSET_PATHS.nightlyMacIconPng,
@@ -3052,14 +3124,13 @@ export const stageWindowsServerSidecar = Effect.fn("stageWindowsServerSidecar")(
   }
 
   yield* Effect.log("[desktop-artifact] Installing server sidecar runtime externals...");
-  const installCommand = yield* resolveSpawnCommand("vp", [...STAGE_INSTALL_ARGS]);
-  yield* runCommand(
-    ChildProcess.make(installCommand.command, installCommand.args, {
-      cwd: serverStageDir,
-      shell: installCommand.shell,
-    }),
-    { label: "vp install --prod (server sidecar)", verbose: input.verbose },
-  );
+  yield* runWorkspaceVp({
+    repoRoot: input.repoRoot,
+    args: STAGE_INSTALL_ARGS,
+    cwd: serverStageDir,
+    label: "vp install --prod (server sidecar)",
+    verbose: input.verbose,
+  });
 
   yield* stageWslNodePtyPrebuild({
     stageAppDir: serverStageDir,
@@ -3537,14 +3608,13 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
 
   if (!options.skipBuild) {
     yield* Effect.log("[desktop-artifact] Building desktop/server/web artifacts...");
-    const spawnCommand = yield* resolveSpawnCommand("vp", ["run", "build:desktop"]);
-    yield* runCommand(
-      ChildProcess.make(spawnCommand.command, spawnCommand.args, {
-        cwd: repoRoot,
-        shell: spawnCommand.shell,
-      }),
-      { label: "vp run build:desktop", verbose: options.verbose },
-    );
+    yield* runWorkspaceVp({
+      repoRoot,
+      args: ["run", "build:desktop"],
+      cwd: repoRoot,
+      label: "vp run build:desktop",
+      verbose: options.verbose,
+    });
   }
 
   const requiredBuildInputs = [
@@ -3818,14 +3888,13 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
   }
 
   yield* Effect.log("[desktop-artifact] Installing staged production dependencies...");
-  const installCommand = yield* resolveSpawnCommand("vp", [...STAGE_INSTALL_ARGS]);
-  yield* runCommand(
-    ChildProcess.make(installCommand.command, installCommand.args, {
-      cwd: stageAppDir,
-      shell: installCommand.shell,
-    }),
-    { label: "vp install --prod", verbose: options.verbose },
-  );
+  yield* runWorkspaceVp({
+    repoRoot,
+    args: STAGE_INSTALL_ARGS,
+    cwd: stageAppDir,
+    label: "vp install --prod",
+    verbose: options.verbose,
+  });
   yield* stageClerkPasskeyNativeBinaries(stageAppDir, options.platform, options.arch);
   yield* stageKeyringNativeBinaries(stageAppDir, options.platform, options.arch);
 
@@ -3911,18 +3980,14 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
     "--publish",
     "never",
   ];
-  const builderCommand = yield* resolveSpawnCommand("vp", builderArgs, { env: buildEnv });
-  yield* runCommand(
-    ChildProcess.make(builderCommand.command, builderCommand.args, {
-      cwd: repoRoot,
-      env: buildEnv,
-      shell: builderCommand.shell,
-    }),
-    {
-      label: `vp exec --filter @t3tools/desktop -- electron-builder --projectDir ${stageAppDir} ${platformConfig.cliFlag} --${options.arch} --publish never`,
-      verbose: options.verbose,
-    },
-  );
+  yield* runWorkspaceVp({
+    repoRoot,
+    args: builderArgs,
+    cwd: repoRoot,
+    env: buildEnv,
+    label: `vp exec --filter @t3tools/desktop -- electron-builder --projectDir ${stageAppDir} ${platformConfig.cliFlag} --${options.arch} --publish never`,
+    verbose: options.verbose,
+  });
 
   const stageDistDir = path.join(stageAppDir, "dist");
   if (!(yield* fs.exists(stageDistDir))) {

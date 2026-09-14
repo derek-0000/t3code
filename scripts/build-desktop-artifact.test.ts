@@ -68,6 +68,9 @@ import {
   stageWslRuntimeArchive,
   bundlesWslRuntime,
   STAGE_INSTALL_ARGS,
+  resolveWorkspaceNodeBinDir,
+  resolveWorkspaceVpExecutable,
+  withWorkspaceNodeBinOnPath,
   ancestorNodeModulesPaths,
   copyDirectoryPreservingSymlinks,
   LinuxBrowserSecretHostError,
@@ -423,6 +426,26 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
       ),
       {},
     );
+  });
+
+  it("resolves vp from the workspace node_modules/.bin directory", () => {
+    const repoRoot = "/repo";
+    const binDir = resolveWorkspaceNodeBinDir(repoRoot);
+    assert.equal(binDir, NodePath.resolve(repoRoot, "node_modules", ".bin"));
+    assert.equal(resolveWorkspaceVpExecutable(repoRoot, "linux"), NodePath.join(binDir, "vp"));
+    assert.equal(resolveWorkspaceVpExecutable(repoRoot, "darwin"), NodePath.join(binDir, "vp"));
+    assert.equal(resolveWorkspaceVpExecutable(repoRoot, "win32"), NodePath.join(binDir, "vp.cmd"));
+  });
+
+  it("puts the workspace node_modules/.bin directory first on PATH", () => {
+    const repoRoot = "/repo";
+    const binDir = resolveWorkspaceNodeBinDir(repoRoot);
+    const withRelativePath = withWorkspaceNodeBinOnPath(repoRoot, {
+      PATH: `./node_modules/.bin${NodePath.delimiter}/usr/bin`,
+    });
+    assert.equal(withRelativePath.PATH?.split(NodePath.delimiter)[0], binDir);
+    assert.ok(withRelativePath.PATH?.includes("./node_modules/.bin"));
+    assert.equal(withWorkspaceNodeBinOnPath(repoRoot, withRelativePath), withRelativePath);
   });
 
   it("installs optional native dependencies for the target desktop architecture", () => {
