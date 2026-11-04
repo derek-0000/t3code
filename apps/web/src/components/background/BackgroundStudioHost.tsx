@@ -16,7 +16,6 @@ const BackgroundStudioPanel = lazy(() =>
 export function BackgroundStudioHost() {
   const open = useBackgroundStudioStore((store) => store.open);
   const closeBackgroundStudio = useBackgroundStudioStore((store) => store.closeBackgroundStudio);
-  const themeSession = useThemeEditorStore((store) => store.session);
   const pathname = useLocation({ select: (location) => location.pathname });
   const navigate = useNavigate();
   const chatPath = useRouterState({
@@ -27,6 +26,7 @@ export function BackgroundStudioHost() {
   const returning = useRef(false);
   const dismiss = isBackgroundStudioDismissPath(pathname);
 
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- Keep the router on a chat while the floating studio is open.
   useEffect(() => {
     if (chatPath !== null) lastChat.current = chatPath;
     const action = backgroundStudioNavAction({
@@ -47,9 +47,14 @@ export function BackgroundStudioHost() {
     wasOpen.current = open;
   }, [chatPath, closeBackgroundStudio, dismiss, navigate, open, pathname]);
 
-  useEffect(() => {
-    if (themeSession !== null) closeBackgroundStudio();
-  }, [closeBackgroundStudio, themeSession]);
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- Subscribe to the theme editor so the two floating editors cannot overlap.
+  useEffect(
+    () =>
+      useThemeEditorStore.subscribe((store) => {
+        if (store.session !== null) closeBackgroundStudio();
+      }),
+    [closeBackgroundStudio],
+  );
 
   if (!open || dismiss) return null;
   return (

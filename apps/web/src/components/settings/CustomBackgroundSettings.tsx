@@ -1,6 +1,6 @@
 import { useBackgroundStudioStore } from "~/customBackground/backgroundStudioStore";
 import { useActiveBackground } from "~/customBackground/useActiveBackground";
-import { useClientSettings, useUpdateClientSettings } from "~/hooks/useSettings";
+import { useClientSettings, useUpdateEnvironmentSettings } from "~/hooks/useSettings";
 import { Button } from "../ui/button";
 import { Switch } from "../ui/switch";
 import { SettingResetButton, SettingsRow, SettingsSection } from "./settingsLayout";
@@ -11,7 +11,7 @@ export function CustomBackgroundSettings() {
   const active = useActiveBackground();
   const enabled = useClientSettings((settings) => settings.customBackgroundEnabled);
   const libraryCount = useClientSettings((settings) => settings.customBackgrounds.length);
-  const updateSettings = useUpdateClientSettings();
+  const updateSettings = useUpdateEnvironmentSettings(null);
   const openBackgroundStudio = useBackgroundStudioStore((store) => store.openBackgroundStudio);
 
   return (

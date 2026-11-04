@@ -9,7 +9,7 @@ import {
 } from "@t3tools/contracts";
 import * as Schema from "effect/Schema";
 import { PlusIcon, XIcon } from "lucide-react";
-import { type CSSProperties, useId, useMemo } from "react";
+import { type CSSProperties, useId } from "react";
 
 import { cn } from "~/lib/utils";
 import { ThemeColorPicker } from "../settings/ThemeColorPicker";
@@ -78,7 +78,7 @@ export function RangeControl({
   } as CSSProperties;
   return (
     <div className="flex items-center gap-3">
-      <label htmlFor={inputId} className="w-28 shrink-0 truncate text-[13px] text-muted-foreground">
+      <label htmlFor={inputId} className="w-28 shrink-0 truncate text-sm text-muted-foreground">
         {label}
       </label>
       <input
@@ -118,7 +118,7 @@ function BooleanControl({
   const id = useId();
   return (
     <div className="flex items-center gap-3">
-      <label htmlFor={id} className="w-28 shrink-0 truncate text-[13px] text-muted-foreground">
+      <label htmlFor={id} className="w-28 shrink-0 truncate text-sm text-muted-foreground">
         {spec.label}
       </label>
       <Switch id={id} size="sm" checked={value} onCheckedChange={onChange} />
@@ -185,7 +185,6 @@ function ColorListControl({
         <Button
           size="xs"
           variant="ghost-muted"
-          className="rounded-full"
           onClick={() => onChange([...value, value[value.length - 1] ?? "#888888"])}
         >
           <PlusIcon />
@@ -211,10 +210,7 @@ export function BackgroundControls({
   onChange: (filter: CustomBackgroundFilter) => void;
   className?: string;
 }) {
-  const controls = useMemo(
-    () => (filter.kind === "none" ? {} : customBackgroundFilterControls(filter.kind)),
-    [filter.kind],
-  );
+  const controls = filter.kind === "none" ? {} : customBackgroundFilterControls(filter.kind);
   const entries = Object.entries(controls);
   const colorEntries = entries.filter(([, spec]) => isColorSpec(spec));
   const otherEntries = entries.filter(([, spec]) => !isColorSpec(spec));
@@ -251,7 +247,7 @@ export function BackgroundControls({
           case "select":
             return (
               <div key={key} className="flex items-center gap-3">
-                <span className="w-28 shrink-0 truncate text-[13px] text-muted-foreground">
+                <span className="w-28 shrink-0 truncate text-sm text-muted-foreground">
                   {spec.label}
                 </span>
                 <Select
@@ -290,7 +286,7 @@ export function BackgroundControls({
       })}
       {colorEntries.length > 0 && !palettesHidden ? (
         <div className="flex items-start gap-3">
-          <span className="w-28 shrink-0 pt-1 text-[13px] text-muted-foreground">Colors</span>
+          <span className="w-28 shrink-0 pt-1 text-sm text-muted-foreground">Colors</span>
           <div className="flex min-w-0 flex-1 flex-wrap gap-1.5">
             {colorEntries.map(([key, spec]) => {
               const current: unknown = Reflect.get(filter, key);

@@ -1,5 +1,3 @@
-"use client";
-
 import { AlertDialog as AlertDialogPrimitive } from "@base-ui/react/alert-dialog";
 
 import { cn } from "~/lib/utils";
@@ -8,15 +6,17 @@ import {
   DIALOG_MOBILE_SHEET_CLASS,
   DIALOG_POPUP_CLASS,
 } from "~/components/ui/dialog-styles";
+import { ControlledOpenContext, renderRetainedPopup } from "~/components/ui/dialog";
 
-/**
- * Menus, selects, and popovers sit at z-[130] so they can open from dialogs
- * (z-50). Alerts are blocking, so they have to cover that layer; otherwise an
- * open menu paints through the overlay and steals clicks.
- */
-const ALERT_DIALOG_LAYER_CLASS = "z-[150]";
+const ALERT_DIALOG_LAYER_CLASS = "z-[calc(50+var(--alert-dialog-layer,0))]";
 
-const AlertDialog = AlertDialogPrimitive.Root;
+function AlertDialog<Payload>(props: AlertDialogPrimitive.Root.Props<Payload>) {
+  return (
+    <ControlledOpenContext value={props.open}>
+      <AlertDialogPrimitive.Root {...props} />
+    </ControlledOpenContext>
+  );
+}
 
 const AlertDialogPortal = AlertDialogPrimitive.Portal;
 
@@ -68,6 +68,7 @@ function AlertDialogPopup({
             className,
           )}
           data-slot="alert-dialog-popup"
+          render={renderRetainedPopup}
           {...props}
         />
       </AlertDialogViewport>
@@ -78,7 +79,10 @@ function AlertDialogPopup({
 function AlertDialogHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
-      className={cn("flex flex-col gap-2 p-6 text-center max-sm:pb-4 sm:text-left", className)}
+      className={cn(
+        "flex min-h-0 flex-col gap-2 p-6 text-center max-sm:pb-4 sm:text-left",
+        className,
+      )}
       data-slot="alert-dialog-header"
       {...props}
     />
@@ -109,7 +113,7 @@ function AlertDialogFooter({
 function AlertDialogTitle({ className, ...props }: AlertDialogPrimitive.Title.Props) {
   return (
     <AlertDialogPrimitive.Title
-      className={cn("wrap-anywhere font-semibold text-xl leading-none", className)}
+      className={cn("wrap-anywhere shrink-0 font-semibold text-xl leading-snug", className)}
       data-slot="alert-dialog-title"
       {...props}
     />
@@ -119,7 +123,10 @@ function AlertDialogTitle({ className, ...props }: AlertDialogPrimitive.Title.Pr
 function AlertDialogDescription({ className, ...props }: AlertDialogPrimitive.Description.Props) {
   return (
     <AlertDialogPrimitive.Description
-      className={cn("text-muted-foreground text-sm", className)}
+      className={cn(
+        "wrap-anywhere max-h-[min(24rem,60dvh)] min-h-0 overflow-y-auto overscroll-contain text-muted-foreground text-sm select-text",
+        className,
+      )}
       data-slot="alert-dialog-description"
       {...props}
     />

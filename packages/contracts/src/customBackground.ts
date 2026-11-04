@@ -206,7 +206,7 @@ function defineFilter<
   return { kind, controls, schema, defaults };
 }
 
-export const IMAGE_DITHERING_FILTER = defineFilter("image-dithering", {
+const IMAGE_DITHERING_FILTER = defineFilter("image-dithering", {
   type: select("Type", ["random", "2x2", "4x4", "8x8"], "2x2"),
   size: number("Size", { min: 0.5, max: 20, step: 0.2 }, 2),
   colorSteps: integer("Color steps", { min: 1, max: 7 }, 3),
@@ -219,7 +219,7 @@ export const IMAGE_DITHERING_FILTER = defineFilter("image-dithering", {
   scale: imageScale,
 });
 
-export const FLUTED_GLASS_FILTER = defineFilter("fluted-glass", {
+const FLUTED_GLASS_FILTER = defineFilter("fluted-glass", {
   size: number("Size", { min: 0, max: 1, step: 0.001 }, 0.7),
   shape: select(
     "Shape",
@@ -249,7 +249,7 @@ export const FLUTED_GLASS_FILTER = defineFilter("fluted-glass", {
   scale: number("Scale", IMAGE_SCALE, 4),
 });
 
-export const LENS_DISTORTION_FILTER = defineFilter("lens-distortion", {
+const LENS_DISTORTION_FILTER = defineFilter("lens-distortion", {
   count: integer("Count", { min: 2, max: 50 }, 17),
   angle: number("Angle", ROTATION, 12),
   spread: number("Spread", UNIT, 0.08),
@@ -274,7 +274,7 @@ export const LENS_DISTORTION_FILTER = defineFilter("lens-distortion", {
   scale: imageScale,
 });
 
-export const STATIC_MESH_GRADIENT_FILTER = defineFilter("static-mesh-gradient", {
+const STATIC_MESH_GRADIENT_FILTER = defineFilter("static-mesh-gradient", {
   colors: colors("Colors", { min: 1, max: 10 }, ["#000000", "#000000", "#122d4e", "#2f6a6a"]),
   positions: integer("Positions", { min: 0, max: 100 }, 2),
   waveX: number("Wave X", UNIT, 1),
@@ -290,7 +290,7 @@ export const STATIC_MESH_GRADIENT_FILTER = defineFilter("static-mesh-gradient", 
   scale: number("Scale", PATTERN_SCALE, 1),
 });
 
-export const GRAIN_GRADIENT_FILTER = defineFilter("grain-gradient", {
+const GRAIN_GRADIENT_FILTER = defineFilter("grain-gradient", {
   colorBack: color("Background", "#000000"),
   colors: colors("Colors", { min: 1, max: 7 }, ["#22edee", "#fd0f9a", "#22d3ee", "#000000"]),
   shape: select(
@@ -337,8 +337,7 @@ export type CustomBackgroundImageFilterKind =
 export type CustomBackgroundGenerativeFilterKind =
   (typeof CUSTOM_BACKGROUND_GENERATIVE_FILTERS)[number]["kind"];
 
-export const DEFAULT_CUSTOM_BACKGROUND_FILTER: CustomBackgroundFilter =
-  IMAGE_DITHERING_FILTER.defaults;
+const DEFAULT_CUSTOM_BACKGROUND_FILTER: CustomBackgroundFilter = IMAGE_DITHERING_FILTER.defaults;
 
 export function isGenerativeCustomBackgroundFilter(
   kind: CustomBackgroundFilterKind,

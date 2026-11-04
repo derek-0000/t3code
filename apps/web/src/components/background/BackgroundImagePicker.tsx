@@ -11,7 +11,6 @@ import {
   useBackgroundImageUrl,
 } from "~/customBackground/imageStore";
 import { cn } from "~/lib/utils";
-import { Button } from "../ui/button";
 import { Menu, MenuPopup, MenuTrigger } from "../ui/menu";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 
@@ -23,9 +22,8 @@ const BACKGROUND_FILE_TYPES_LABEL = CUSTOM_BACKGROUND_ACCEPTED_TYPES.map((type) 
 export function backgroundStudioFieldClass(className?: string): string {
   return cn(
     "relative inline-flex h-7.5 min-w-0 w-full flex-1 items-center rounded-lg border border-input bg-background text-sm text-foreground shadow-xs/5 outline-none not-dark:bg-clip-padding ring-ring/24 transition-shadow sm:h-6.5",
-    "before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--radius-lg)-1px)]",
-    "not-has-disabled:not-has-focus-visible:not-focus-visible:before:shadow-[0_1px_--theme(--color-black/4%)] dark:not-has-disabled:not-has-focus-visible:not-focus-visible:before:shadow-[0_-1px_--theme(--color-white/6%)]",
-    "has-focus-visible:border-ring has-focus-visible:ring-[3px] focus-visible:border-ring focus-visible:ring-[3px]",
+    "before:pointer-events-none before:absolute before:inset-0 before:rounded-lg",
+    "has-focus-visible:border-ring has-focus-visible:ring-2 has-focus-visible:ring-inset focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-inset",
     "has-[:disabled,:focus-visible]:shadow-none focus-visible:shadow-none",
     "has-disabled:opacity-64 disabled:opacity-64",
     "dark:bg-input/32",
@@ -35,18 +33,21 @@ export function backgroundStudioFieldClass(className?: string): string {
 
 export function backgroundPickerTileClass(selected: boolean): string {
   return cn(
-    "block w-full overflow-hidden rounded-lg border outline-none focus-visible:ring-2 focus-visible:ring-ring",
-    selected ? "border-primary ring-2 ring-primary/40" : "border-border/60 hover:border-border",
+    "block w-full overflow-hidden rounded-lg border outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+    selected
+      ? "border-primary ring-2 ring-inset ring-primary/40"
+      : "border-border/60 hover:border-border",
   );
 }
 
 export const backgroundPickerMenuGridClass = "grid max-h-72 grid-cols-3 overflow-y-auto p-2";
 
 export const backgroundPickerDeleteButtonClass =
-  "absolute right-1 top-1 bg-popover opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100";
+  "absolute right-1 top-1 inline-flex size-6 cursor-pointer items-center justify-center rounded-md bg-popover text-muted-foreground hover:bg-accent hover:text-foreground outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring disabled:opacity-50 disabled:pointer-events-none opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100";
 
 function useStoredBackgroundImages(): ReadonlyArray<StoredBackgroundImage> | null {
   const [images, setImages] = useState<ReadonlyArray<StoredBackgroundImage> | null>(null);
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- Load IndexedDB images and subscribe to uploads and deletions while this picker is mounted.
   useEffect(() => {
     let cancelled = false;
     const refresh = () => {
@@ -150,7 +151,7 @@ export function BackgroundImagePicker({
 
   return (
     <div className="flex items-center gap-3">
-      <span className="w-28 shrink-0 text-[13px] text-muted-foreground">Image</span>
+      <span className="w-28 shrink-0 text-sm text-muted-foreground">Image</span>
       <input
         ref={inputRef}
         type="file"
@@ -198,11 +199,11 @@ export function BackgroundImagePicker({
               data-drop-target="upload"
               data-dragging={dragTarget === "upload"}
               onClick={() => inputRef.current?.click()}
-              className="col-span-full flex min-h-20 flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border text-xs text-muted-foreground outline-none hover:border-foreground/40 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 data-[dragging=true]:border-primary data-[dragging=true]:bg-primary/10"
+              className="col-span-full flex min-h-20 flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border text-xs text-muted-foreground outline-none hover:border-foreground/40 hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring disabled:opacity-50 data-[dragging=true]:border-primary data-[dragging=true]:bg-primary/10"
             >
               <UploadIcon className="size-4" />
               <span>Upload or drop an image</span>
-              <span className="text-[11px]">{BACKGROUND_FILE_TYPES_LABEL}</span>
+              <span className="text-2xs">{BACKGROUND_FILE_TYPES_LABEL}</span>
             </button>
             {images?.map((image) => (
               <div key={image.id} className="group relative">
@@ -222,15 +223,14 @@ export function BackgroundImagePicker({
                   <Tooltip>
                     <TooltipTrigger
                       render={
-                        <Button
-                          size="icon-micro"
-                          variant="outline"
+                        <button
+                          type="button"
                           className={backgroundPickerDeleteButtonClass}
                           aria-label="Delete unused image"
                           onClick={() => void deleteBackgroundImage(image.id)}
                         >
-                          <Trash2Icon />
-                        </Button>
+                          <Trash2Icon className="size-3.5" />
+                        </button>
                       }
                     />
                     <TooltipPopup side="top">Delete unused image</TooltipPopup>

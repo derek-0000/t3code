@@ -20,7 +20,8 @@ import {
   Trash2Icon,
   Undo2Icon,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useStableCallback } from "~/hooks/useStableCallback";
 
 import { useBackgroundStudioStore } from "~/customBackground/backgroundStudioStore";
 import { storeBackgroundImage } from "~/customBackground/imageStore";
@@ -35,22 +36,18 @@ import {
   upsertBackground,
   withFilterKind,
 } from "~/customBackground/records";
-import { getClientSettings, useClientSettings, useUpdateClientSettings } from "~/hooks/useSettings";
+import {
+  getClientSettings,
+  useClientSettings,
+  useUpdateEnvironmentSettings,
+} from "~/hooks/useSettings";
 import { cn, randomUUID } from "~/lib/utils";
 import { ensureLocalApi } from "~/localApi";
 import { Button } from "../ui/button";
 import { Switch } from "../ui/switch";
-import { Input } from "../ui/input";
 import { Menu, MenuPopup, MenuTrigger } from "../ui/menu";
 import { ScrollArea } from "../ui/scroll-area";
-import {
-  Select,
-  SelectItem,
-  SelectPopup,
-  SelectTrigger,
-  SelectValue,
-  selectTriggerVariants,
-} from "../ui/select";
+import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { BackgroundControls, RangeControl } from "./BackgroundControls";
 import {
@@ -101,13 +98,9 @@ function NameField({ name, onCommit }: { name: string; onCommit: (name: string) 
     if (trimmed !== name) onCommit(trimmed);
   };
   return (
-    <Input
+    <input
       aria-label="Background name"
-      size="sm"
-      unstyled
-      className={backgroundStudioFieldClass(
-        "[&_[data-slot=input]]:h-full sm:[&_[data-slot=input]]:h-full",
-      )}
+      className={backgroundStudioFieldClass("px-2.5")}
       value={draft}
       onChange={(event) => setDraft(event.currentTarget.value)}
       onBlur={commit}
@@ -186,19 +179,18 @@ function LibraryTile({
         <LibraryThumb record={record} className="aspect-[4/3] w-full" />
         <span className="block space-y-0.5 px-1.5 py-1.5">
           <span className="block truncate text-xs text-foreground">{name}</span>
-          <span className="block truncate text-[11px] text-muted-foreground">{filter}</span>
+          <span className="block truncate text-2xs text-muted-foreground">{filter}</span>
         </span>
       </button>
       {onDelete ? (
-        <Button
-          size="icon-xs"
-          variant="outline"
+        <button
+          type="button"
           className={backgroundPickerDeleteButtonClass}
           aria-label={`Delete background ${name}`}
           onClick={onDelete}
         >
-          <Trash2Icon />
-        </Button>
+          <Trash2Icon className="size-3.5" />
+        </button>
       ) : null}
     </div>
   );
@@ -230,15 +222,12 @@ function LibraryPicker({
           <button
             type="button"
             aria-label={`Background: ${name}, ${filter}`}
-            className={cn(
-              selectTriggerVariants({ size: "default" }),
-              "h-auto w-full items-center py-1.5",
-            )}
+            className={backgroundStudioFieldClass("h-auto flex-none gap-2 px-2.5 py-1.5 sm:h-auto")}
           >
             <LibraryThumb record={selectedRecord} className="size-8 shrink-0 rounded-md" />
             <span className="min-w-0 flex-1 text-left leading-tight">
               <span className="block truncate text-sm font-medium text-foreground">{name}</span>
-              <span className="block truncate text-[11px] text-muted-foreground">{filter}</span>
+              <span className="block truncate text-2xs text-muted-foreground">{filter}</span>
             </span>
             <ChevronsUpDownIcon className="-me-1 size-4 opacity-80" />
           </button>
@@ -276,6 +265,7 @@ export function BackgroundStudioPanel({ onClose }: { onClose: () => void }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const mounted = useRef(true);
   const dragOffset = useRef<{ x: number; y: number } | null>(null);
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- Track mount lifetime for uploads and reset the floating panel after window resize.
   useEffect(() => {
     mounted.current = true;
     const resetPosition = () => setPosition(null);
@@ -289,7 +279,7 @@ export function BackgroundStudioPanel({ onClose }: { onClose: () => void }) {
   const activeId = useClientSettings((settings) => settings.activeCustomBackgroundId);
   const inConversations = useClientSettings((settings) => settings.customBackgroundInConversations);
   const enabled = useClientSettings((settings) => settings.customBackgroundEnabled);
-  const updateSettings = useUpdateClientSettings();
+  const updateSettings = useUpdateEnvironmentSettings(null);
 
   const selectedId = activeId;
   const liveRecord = useBackgroundStudioStore((store) => store.preview);
@@ -305,26 +295,21 @@ export function BackgroundStudioPanel({ onClose }: { onClose: () => void }) {
   // Flush the latest edit on unmount without waiting for a React update.
   const pendingRef = useRef<CustomBackgroundRecord | null>(null);
 
-  const storedRecord = useMemo(
-    () => (selectedId === null ? null : (library.find((r) => r.id === selectedId) ?? null)),
-    [library, selectedId],
-  );
+  const storedRecord =
+    selectedId === null ? null : (library.find((r) => r.id === selectedId) ?? null);
   const record = liveRecord && liveRecord.id === selectedId ? liveRecord : storedRecord;
-  const persistLibrary = useCallback(
-    (next: CustomBackgroundLibrary, nextActiveId?: string | null) => {
-      updateSettings(
-        nextActiveId === undefined
-          ? { customBackgrounds: next }
-          : {
-              customBackgrounds: next,
-              activeCustomBackgroundId: nextActiveId,
-            },
-      );
-    },
-    [updateSettings],
-  );
+  const persistLibrary = (next: CustomBackgroundLibrary, nextActiveId?: string | null) => {
+    updateSettings(
+      nextActiveId === undefined
+        ? { customBackgrounds: next }
+        : {
+            customBackgrounds: next,
+            activeCustomBackgroundId: nextActiveId,
+          },
+    );
+  };
 
-  const flushPending = useCallback(() => {
+  const flushPending = useStableCallback(() => {
     if (persistTimer.current) {
       clearTimeout(persistTimer.current);
       persistTimer.current = null;
@@ -335,18 +320,16 @@ export function BackgroundStudioPanel({ onClose }: { onClose: () => void }) {
       persistLibrary(upsertBackground(getClientSettings().customBackgrounds, pending));
     }
     setLiveRecord(null);
-  }, [persistLibrary, setLiveRecord]);
+  });
 
-  const commitRecord = useCallback(
-    (next: CustomBackgroundRecord) => {
-      pendingRef.current = next;
-      setLiveRecord(next);
-      if (persistTimer.current) clearTimeout(persistTimer.current);
-      persistTimer.current = setTimeout(flushPending, PERSIST_DEBOUNCE_MS);
-    },
-    [flushPending, setLiveRecord],
-  );
+  const commitRecord = (next: CustomBackgroundRecord) => {
+    pendingRef.current = next;
+    setLiveRecord(next);
+    if (persistTimer.current) clearTimeout(persistTimer.current);
+    persistTimer.current = setTimeout(flushPending, PERSIST_DEBOUNCE_MS);
+  };
 
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- Flush the persistence timer when the studio unmounts.
   useEffect(() => flushPending, [flushPending]);
 
   const selectRow = (id: string | null) => {
@@ -399,13 +382,9 @@ export function BackgroundStudioPanel({ onClose }: { onClose: () => void }) {
     );
   };
 
-  const referencedImageIds = useMemo(() => {
-    const ids = new Set<string>();
-    for (const entry of library) {
-      if (entry.source.kind === "image") ids.add(entry.source.imageId);
-    }
-    return ids;
-  }, [library]);
+  const referencedImageIds = new Set(
+    library.flatMap((entry) => (entry.source.kind === "image" ? [entry.source.imageId] : [])),
+  );
 
   const filtersAvailable = isWebGlAvailable();
   const filterIsDefault =
@@ -512,7 +491,7 @@ export function BackgroundStudioPanel({ onClose }: { onClose: () => void }) {
               </label>
             </div>
             <div className="flex items-center justify-between gap-2">
-              <span className="text-[13px] font-medium text-foreground">Background</span>
+              <span className="text-sm font-medium text-foreground">Background</span>
               <Button
                 size="xs"
                 variant="outline"
@@ -534,7 +513,7 @@ export function BackgroundStudioPanel({ onClose }: { onClose: () => void }) {
               <ScrollArea className="min-h-0 flex-1" scrollFade>
                 <div className="space-y-4">
                   <div className="flex items-center gap-3">
-                    <span className="w-28 shrink-0 text-[13px] text-muted-foreground">Name</span>
+                    <span className="w-28 shrink-0 text-sm text-muted-foreground">Name</span>
                     <NameField
                       key={record.id}
                       name={record.name}
@@ -586,7 +565,7 @@ export function BackgroundStudioPanel({ onClose }: { onClose: () => void }) {
                     />
                   ) : null}
 
-                  <h3 className="text-[13px] font-medium">Filter</h3>
+                  <h3 className="text-sm font-medium">Filter</h3>
                   {!filtersAvailable ? (
                     <p role="status" className="text-xs text-muted-foreground">
                       Filters need WebGL to be active.
@@ -594,9 +573,7 @@ export function BackgroundStudioPanel({ onClose }: { onClose: () => void }) {
                   ) : null}
                   <div className="shrink-0">
                     <div className="flex items-center gap-3">
-                      <span className="w-28 shrink-0 text-[13px] text-muted-foreground">
-                        Filter
-                      </span>
+                      <span className="w-28 shrink-0 text-sm text-muted-foreground">Filter</span>
                       <Select
                         disabled={!filtersAvailable}
                         value={record.filter.kind}
@@ -653,7 +630,7 @@ export function BackgroundStudioPanel({ onClose }: { onClose: () => void }) {
                   </div>
 
                   {upload.error ? (
-                    <p role="alert" className="pl-[calc(7rem+0.75rem)] text-xs text-destructive">
+                    <p role="alert" className="pl-31 text-xs text-destructive">
                       {upload.error}
                     </p>
                   ) : null}
@@ -687,7 +664,7 @@ export function BackgroundStudioPanel({ onClose }: { onClose: () => void }) {
                 </div>
               </ScrollArea>
             ) : (
-              <div className="flex min-h-0 flex-1 items-center justify-center rounded-lg border border-dashed border-border/60 p-6 text-center text-[13px] text-muted-foreground">
+              <div className="flex min-h-0 flex-1 items-center justify-center rounded-lg border border-dashed border-border/60 p-6 text-center text-sm text-muted-foreground">
                 Add a background to get started, or pick one to edit.
               </div>
             )}
